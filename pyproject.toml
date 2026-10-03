@@ -1,0 +1,17 @@
+[project]
+name = "neural-networks-and-deep-learning-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Gaurang Gupta", email = "gaurangrgupta@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+neural-networks-and-deep-learning-project = "neural_networks_and_deep_learning_project:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
