@@ -15,3 +15,13 @@ neural-networks-and-deep-learning-project = "neural_networks_and_deep_learning_p
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "jupyterlab>=4.6.4",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "soundfile>=0.14.0",
+]

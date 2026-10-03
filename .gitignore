@@ -9,6 +9,15 @@ wheels/
 # Virtual environments
 .venv
 
+# Downloaded audio and label archives. Do not commit these.
+data/*
+!data/README.md
+
+# EDA pictures written by the notebook. The notebook stores the same pictures in its outputs.
+reports/eda/
+
+# Jupyter autosave copies
+.ipynb_checkpoints/
 
 submission_documents/
 internal_documents/
