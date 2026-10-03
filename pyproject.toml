@@ -7,7 +7,12 @@ authors = [
     { name = "Gaurang Gupta", email = "gaurangrgupta@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.3",
+    "scikit-learn>=1.9.1",
+    "scipy>=1.18.1",
+    "soundfile>=0.14.0",
+]
 
 [project.scripts]
 neural-networks-and-deep-learning-project = "neural_networks_and_deep_learning_project:main"
@@ -23,5 +28,6 @@ dev = [
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
     "pandas>=3.0.6",
+    "pytest>=9.1.1",
     "soundfile>=0.14.0",
 ]
