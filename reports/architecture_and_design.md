@@ -145,6 +145,28 @@ TensorFlow can train the same MLP. PyTorch is the framework we will write the mo
 
 The course constraint is about image-style convolutional models. It is not a constraint on the library brand. The context MLP is a small dense net on rows of the log-mel matrix, written in PyTorch.
 
-## 8. What is not done yet
+## 8. How to run the context MLP
 
-The context MLP has not been trained. The PyTorch package has not been added to the environment yet; it will be added when that network is trained. The decision threshold has not been tuned. Public eval, the `dcase2019` conditions, the real DESED lists, and FSD50K have not been scored. No wav files, feature caches, or archives are part of the git history.
+The training script is `src/nndl_project/train_context_mlp.py`. Run it from the project directory in a terminal you can watch. Stop it with Ctrl+C. The last epoch that finished stays on disk.
+
+Smoke check, 200 training clips and 200 validation clips:
+
+`uv run python -m nndl_project.train_context_mlp --limit 200`
+
+Full training, all 10000 training clips and all 2500 validation clips:
+
+`uv run python -m nndl_project.train_context_mlp`
+
+Each batch prints the weighted loss, the running average, and an estimate of the time left in that pass. At the end of every epoch the script prints segment F1 and event F1 for every class, then writes the checkpoint and the report again. The saved model is the last finished epoch. Validation is not used to pick a different epoch, and the threshold stays at 0.5.
+
+A full run writes `reports/context_mlp.md` and `reports/context_mlp.json`. A prefix run writes `reports/context_mlp_smoke.md` and `reports/context_mlp_smoke.json` instead, so it does not replace the full-data score. Checkpoints and the plain text log are under `data/cache/context_mlp/`, which git ignores along with the rest of `data/*`. Continue a stopped full run with:
+
+`uv run python -m nndl_project.train_context_mlp --resume`
+
+Raise `--epochs` above the last finished epoch when you resume, or the script will tell you there is nothing left to do.
+
+## 9. What is not done yet
+
+The context MLP has been trained. The run used all 10000 synthetic21_train clips and all 2500 synthetic21_validation clips. It was interrupted after epoch 432 of a request for 1000 epochs. The scores in `reports/context_mlp.md` are that last finished epoch: segment micro F1 0.398, segment macro F1 0.349, event micro F1 0.053, event macro F1 0.041. The file `reports/context_mlp_smoke.md` is a 200-clip pipeline check. Those smoke numbers are not the comparison.
+
+The decision threshold has not been tuned. Public eval, the `dcase2019` conditions, the real DESED lists, and FSD50K have not been scored. No wav files, feature caches, or archives are part of the git history.

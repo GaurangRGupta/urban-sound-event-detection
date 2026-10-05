@@ -12,10 +12,19 @@ dependencies = [
     "scikit-learn>=1.9.1",
     "scipy>=1.18.1",
     "soundfile>=0.14.0",
+    "torch>=2.14.1",
 ]
 
 [project.scripts]
 neural-networks-and-deep-learning-project = "neural_networks_and_deep_learning_project:main"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
