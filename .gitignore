@@ -21,3 +21,7 @@ reports/eda/
 
 submission_documents/
 internal_documents/
+
+# Downloaded paper PDFs. papers/README.md stays visible to git so the sources can be fetched again.
+papers/*
+!papers/README.md

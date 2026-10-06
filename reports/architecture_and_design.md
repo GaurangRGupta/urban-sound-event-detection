@@ -1,6 +1,6 @@
 # Architecture and design
 
-This note describes the sound-event pipeline that is in the repository now, and the next network we will train. The deep learning framework for that network is PyTorch.
+This note describes the sound-event pipeline that is in the repository now. It covers the logistic baseline, the context multilayer perceptron (MLP) that has been trained, and the frame gated recurrent unit (GRU) that is next. The deep learning framework is PyTorch.
 
 ## 1. The problem
 
@@ -14,7 +14,7 @@ The ten class names in this pipeline are the DESED names:
 
 `Alarm_bell_ringing`, `Blender`, `Cat`, `Dishes`, `Dog`, `Electric_shaver_toothbrush`, `Frying`, `Running_water`, `Speech`, `Vacuum_cleaner`.
 
-The course street map is not applied here. Under that map, Speech would become speech_crowd, Dog would become dog, and the other eight DESED names would become other. This baseline and the next network both keep the ten DESED names, so the scores can be compared class by class.
+The course street map is not applied here. Under that map, Speech would become speech_crowd, Dog would become dog, and the other eight DESED names would become other. The logistic baseline, the context MLP, and the frame GRU all keep the ten DESED names, so the scores can be compared class by class.
 
 ## 2. Inputs and outputs
 
@@ -108,7 +108,7 @@ Speech has the highest segment F1, 0.778. Event F1 is much lower because the mod
 
 ## 6. Next model: context multilayer perceptron
 
-The next model is one shared multilayer perceptron (MLP). An MLP is a stack of dense layers. This one is not a convolutional network, and it does not take the log-mel matrix as an image.
+The model after the logistic baseline is one shared multilayer perceptron (MLP). An MLP is a stack of dense layers. This one is not a convolutional network, and it does not take the log-mel matrix as an image. It has been trained. Section 9 records the scores. Section 10 is the network that comes after it.
 
 Each example is the frame being classified, the 5 frames before it, and the 5 frames after it. That is 11 frames by 64 bands, flattened to 704 numbers, about 220 milliseconds of context. The edges of a clip repeat the first or last frame so every one of the 497 frames still has a full window.
 
@@ -165,8 +165,68 @@ A full run writes `reports/context_mlp.md` and `reports/context_mlp.json`. A pre
 
 Raise `--epochs` above the last finished epoch when you resume, or the script will tell you there is nothing left to do.
 
-## 9. What is not done yet
+## 9. What the context MLP showed
 
-The context MLP has been trained. The run used all 10000 synthetic21_train clips and all 2500 synthetic21_validation clips. It was interrupted after epoch 432 of a request for 1000 epochs. The scores in `reports/context_mlp.md` are that last finished epoch: segment micro F1 0.398, segment macro F1 0.349, event micro F1 0.053, event macro F1 0.041. The file `reports/context_mlp_smoke.md` is a 200-clip pipeline check. Those smoke numbers are not the comparison.
+The context MLP has been trained. The run used all 10000 synthetic21_train clips and all 2500 synthetic21_validation clips. It was interrupted after epoch 432 of a request for 1000 epochs. The scores in `reports/context_mlp.md` are that last finished epoch.
 
-The decision threshold has not been tuned. Public eval, the `dcase2019` conditions, the real DESED lists, and FSD50K have not been scored. No wav files, feature caches, or archives are part of the git history.
+| Score | Logistic baseline | Context MLP epoch 432 |
+| --- | ---: | ---: |
+| Segment micro F1 | 0.393 | 0.398 |
+| Segment macro F1 | 0.289 | 0.349 |
+| Event micro F1 | 0.044 | 0.053 |
+| Event macro F1 | 0.030 | 0.041 |
+
+Segment macro F1 rose. Segment micro F1 stayed near the baseline. Event F1 stayed near 0.05 for both models. Training loss kept falling through epoch 432. Validation segment micro F1 was already near the baseline by about epoch 50, and later epochs wander between about 0.37 and 0.41. More epochs of the same MLP will not fix the event times.
+
+The MLP sees about 220 milliseconds. On validation clip `0.wav`, reference Speech runs from 6.832 s to 8.674 s. The MLP's main Speech region starts at 7.240 s, about 400 milliseconds late, so it misses the 200 millisecond onset collar, and Speech is split into several short events. The next network is there to carry an event across the whole clip.
+
+The file `reports/context_mlp_smoke.md` is a 200-clip pipeline check. Those smoke numbers are not this comparison.
+
+## 10. Next model: frame gated recurrent unit
+
+The next model is one shared bidirectional GRU. A GRU keeps a hidden state and updates it once per frame. Bidirectional means one state reads the clip forward and one state reads it backward. The two states are concatenated. This is a sequence model on the log-mel frames. It does not take the log-mel matrix as an image, and it has no convolutional layer.
+
+The input is one clip, shape (497, 64), after the same per-band training mean and standard deviation the MLP used. A batch is (batch, 497, 64). The frames stay in time order. They are not flattened into independent rows.
+
+The layers are:
+
+1. One bidirectional GRU. Input size 64, hidden size 64 in each direction, one layer. Each frame then has 128 numbers.
+2. One linear layer from 128 to 10 logits.
+3. A sigmoid on each class, applied inside binary cross-entropy on the logits. Classes can overlap.
+
+The parameter count is 51210, which is smaller than the context MLP. There is no dropout. The optimizer is Adam, learning rate 0.001, weight decay 0, batch 16 clips, seed 0. After backward, the global gradient norm is clipped at 5, and the logged grad_norm is the norm before that clip. The positive class weights are the same idea as the MLP: negative frames divided by positive frames.
+
+The following pieces stay fixed, so a change in event F1 can be attributed to the longer memory.
+
+- The same log-mel cache. The script reuses a finished cache and does not write a second copy of the matrices.
+- The same frame targets.
+- The same decode: median filter of 11 frames, then threshold 0.5. The threshold is not chosen on validation.
+- The same two scores, on all 2500 `synthetic21_validation` clips.
+- The same closed sets. Public eval and the 16 `dcase2019` folders stay closed.
+- The designated model is the last finished epoch. Validation F1 is printed for monitoring. It does not pick the checkpoint and it does not stop the run.
+
+The default request is 30 epochs. That is the planned run. If validation loss is still falling at epoch 30, resume with a higher `--epochs`. Do not resume the context MLP toward 1000 epochs for this comparison.
+
+The training script is `src/nndl_project/train_frame_gru.py`. Run it from the project directory in a terminal you can watch. Stop it with Ctrl+C. The epoch in progress is dropped. The last epoch that finished stays on disk.
+
+Smoke check, 200 training clips and 200 validation clips:
+
+`uv run python -m nndl_project.train_frame_gru --limit 200`
+
+Full training, all 10000 training clips and all 2500 validation clips:
+
+`uv run python -m nndl_project.train_frame_gru`
+
+Continue a stopped full run. `--epochs` must be greater than the last finished epoch:
+
+`uv run python -m nndl_project.train_frame_gru --resume --epochs 30`
+
+Each batch prints the weighted loss, the running average, the unweighted average, the gradient norm on a training batch, and an estimate of the time left in that pass. At the end of every epoch the script prints segment F1 and event F1 for every class, then writes the checkpoint and the report again.
+
+A full planned run writes `reports/frame_gru.md` and `reports/frame_gru.json`. A prefix run writes `reports/frame_gru_smoke.md` and `reports/frame_gru_smoke.json`, so it does not replace the full-data score. The planned checkpoints go to `data/cache/frame_gru/full`, which git ignores along with the rest of `data/*`. A different hidden size, learning rate, weight decay, gradient clip, batch size, or seed is stored in its own folder and its own report name, so it cannot replace the planned checkpoint. The context MLP checkpoints under `data/cache/context_mlp/full` are left as they are.
+
+One epoch walks 497 recurrent steps per clip on the CPU. The time-left line on the first epoch is the estimate to trust. If that line says more than about 15 minutes for the epoch, stop and rerun with a smaller `--hidden` before leaving the job overnight.
+
+## 11. What is not done yet
+
+The frame GRU script is written. It has not been trained on the full split yet. The decision threshold has not been tuned. Public eval, the `dcase2019` conditions, the real DESED lists, and FSD50K have not been scored. No wav files, feature caches, or archives are part of the git history.
