@@ -1,0 +1,8 @@
+[cache]
+    type = "hardlink,copy"
+    protected = true
+[core]
+    remote = storage
+['remote "storage"']
+    url = azure://desed/dvc
+    account_name = nndldesedgg013
