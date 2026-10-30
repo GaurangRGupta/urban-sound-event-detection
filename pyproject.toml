@@ -1,7 +1,7 @@
 [project]
 name = "nndl-project"
 version = "0.1.0"
-description = "Add your description here"
+description = "Urban sound event detection with timestamps (DESED, PyTorch)"
 readme = "README.md"
 authors = [
     { name = "Gaurang Gupta", email = "gaurangrgupta@gmail.com" }
@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [project.scripts]
-neural-networks-and-deep-learning-project = "neural_networks_and_deep_learning_project:main"
+sed-predict = "nndl_project.predict:main"
+sed-evaluate = "nndl_project.evaluate:main"
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }

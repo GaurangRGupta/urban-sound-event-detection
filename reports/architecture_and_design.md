@@ -1,6 +1,6 @@
 # Architecture and design
 
-This note describes the sound-event pipeline that is in the repository now. It covers the logistic baseline, the context multilayer perceptron (MLP) that has been trained, and the frame gated recurrent unit (GRU) that is next. The deep learning framework is PyTorch.
+This note describes the sound-event pipeline that is in the repository now. It covers the logistic baseline, the context multilayer perceptron (MLP), the frame gated recurrent unit (GRU), and the small convolutional recurrent network (CRNN). All four have been trained on the full synthetic training split and scored on the full validation split. Sections 11 to 13 cover the CRNN, the street label map, and the final held-out evaluation. The deep learning framework is PyTorch.
 
 ## 1. The problem
 
@@ -14,7 +14,7 @@ The ten class names in this pipeline are the DESED names:
 
 `Alarm_bell_ringing`, `Blender`, `Cat`, `Dishes`, `Dog`, `Electric_shaver_toothbrush`, `Frying`, `Running_water`, `Speech`, `Vacuum_cleaner`.
 
-The course street map is not applied here. Under that map, Speech would become speech_crowd, Dog would become dog, and the other eight DESED names would become other. The logistic baseline, the context MLP, and the frame GRU all keep the ten DESED names, so the scores can be compared class by class.
+The models are trained on the ten DESED names, so the scores can be compared class by class. The course street map is applied after decoding, in `src/nndl_project/label_map.py`: Speech becomes speech_crowd, Dog becomes dog, and the other eight DESED names become other. Section 12 describes it.
 
 ## 2. Inputs and outputs
 
@@ -227,6 +227,45 @@ A full planned run writes `reports/frame_gru.md` and `reports/frame_gru.json`. A
 
 One epoch walks 497 recurrent steps per clip on the CPU. The time-left line on the first epoch is the estimate to trust. If that line says more than about 15 minutes for the epoch, stop and rerun with a smaller `--hidden` before leaving the job overnight.
 
-## 11. What is not done yet
+## 11. What the frame GRU showed, and the small CRNN
 
-The frame GRU script is written. It has not been trained on the full split yet. The decision threshold has not been tuned. Public eval, the `dcase2019` conditions, the real DESED lists, and FSD50K have not been scored. No wav files, feature caches, or archives are part of the git history.
+The frame GRU finished its 30 planned epochs on all 2500 validation clips: segment micro F1 0.509, segment macro F1 0.438, event micro F1 0.104, event macro F1 0.096. Event F1 doubled from the context MLP. Longer memory helps the event edges. Validation weighted loss rose from about epoch 2 while training loss kept falling, so the network overfits the synthetic training mix. The scores still rose, because the threshold-and-filter decode cares about the ranking of frames more than about calibrated loss.
+
+The next model added a small convolutional front end before the same GRU (`src/nndl_project/crnn.py`). Two 3 by 3 convolutions with 16 and 32 channels, each followed by ReLU and max pooling of frequency by 4, turn the 64 bands into 4 bands by 32 channels, which is 128 numbers per frame. Time is not pooled, so there are still 497 frames. Then one bidirectional GRU, hidden 64 per direction, and a linear layer to 10 logits. 80586 parameters. Same loss, optimizer, class weights, decode, and closed sets as the GRU. Ten epochs.
+
+| Score | Logistic | Context MLP | Frame GRU | Small CRNN |
+| --- | ---: | ---: | ---: | ---: |
+| Segment micro F1 | 0.393 | 0.398 | 0.509 | 0.612 |
+| Segment macro F1 | 0.289 | 0.349 | 0.438 | 0.542 |
+| Event micro F1 | 0.044 | 0.053 | 0.104 | 0.142 |
+| Event macro F1 | 0.030 | 0.041 | 0.096 | 0.155 |
+
+The convolution can learn local time-frequency shapes, such as the harmonic stack of a dog bark or the broadband onset of dishes, that a single mel row cannot show. The CRNN is the designated final model. The problem statement planned a non-convolutional first model; the context MLP and the GRU are that model and its sequence extension, and the CRNN is reported as the extra step it is.
+
+## 12. Street label map
+
+`src/nndl_project/label_map.py` fixes the ten street classes from the problem statement and the map from DESED onto them. `tests/test_label_map.py` checks that every DESED label lands on exactly one of the ten names.
+
+| DESED | street |
+| --- | --- |
+| Speech | speech_crowd |
+| Dog | dog |
+| the other eight | other |
+
+After relabeling, overlapping events of the same street class (for example Dishes and Running_water, both `other`) are merged into one event with the higher score. car_horn, siren, engine_traffic, two_wheeler, construction, music, and bird receive no DESED label. They have no timestamp data in this project. They are listed in every report and are not given a score or a target.
+
+## 13. Prediction and final evaluation
+
+`python -m nndl_project.predict clip.wav` loads a checkpoint and prints the event list for any wav: any channel count, any sample rate, padded or cut to 10 seconds. `--street` reports street names. `--json` writes the list to a file.
+
+`python -m nndl_project.evaluate` does the last step of the method.
+
+1. Frame probabilities on all 2500 validation clips. The fixed decode is scored again as a check against the training report.
+2. The decode is tuned on validation only: one threshold per class from 0.1 to 0.9, and one median length from 5, 11, 21, 31 frames, chosen to maximize event F1.
+3. With those settings frozen, the DESED public test (692 real clips) and the 16 DCASE 2019 synthetic folders are scored once, with both the fixed and the tuned decode, with DESED names and with street names.
+
+The result is `reports/final_evaluation_crnn.md`. The tuned validation number is fitted to validation and is optimistic. The public-test number is the honest one.
+
+## 14. What is not done
+
+FSD50K audio and the real DESED weak-label waves were never downloaded, so the clip-level (weak) loss from the problem statement was not trained. The street classes outside speech_crowd, dog, and other have no timestamp labels. No data augmentation, dropout, or early stopping was used; the designated model is always the last finished epoch.

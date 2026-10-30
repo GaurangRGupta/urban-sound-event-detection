@@ -35,8 +35,8 @@ class Counts:
         self.fn += other.fn
 
 
-def empty_counts() -> dict[str, Counts]:
-    return {name: Counts() for name in CLASSES}
+def empty_counts(classes: tuple[str, ...] = CLASSES) -> dict[str, Counts]:
+    return {name: Counts() for name in classes}
 
 
 def precision_recall_f1(counts: Counts) -> tuple[float, float, float] | None:
@@ -57,9 +57,10 @@ def micro_counts(by_class: dict[str, Counts]) -> Counts:
     return total
 
 
-def macro_f1(by_class: dict[str, Counts]) -> float | None:
+def macro_f1(by_class: dict[str, Counts], classes: tuple[str, ...] | None = None) -> float | None:
+    """Mean F1 over the classes that have anything to score. Defaults to every key."""
     scores = []
-    for name in CLASSES:
+    for name in (classes if classes is not None else tuple(by_class)):
         row = precision_recall_f1(by_class[name])
         if row is not None:
             scores.append(row[2])
@@ -68,8 +69,8 @@ def macro_f1(by_class: dict[str, Counts]) -> float | None:
     return float(np.mean(scores))
 
 
-def _by_class(events: list[Event]) -> dict[str, list[Event]]:
-    grouped = {name: [] for name in CLASSES}
+def _by_class(events: list[Event], classes: tuple[str, ...] = CLASSES) -> dict[str, list[Event]]:
+    grouped: dict[str, list[Event]] = {name: [] for name in classes}
     for event in events:
         grouped[event.label].append(event)
     return grouped
@@ -81,16 +82,17 @@ def segment_counts_for_clip(
     *,
     clip_seconds: float = CLIP_SECONDS,
     segment_seconds: float = SEGMENT_SECONDS,
+    classes: tuple[str, ...] = CLASSES,
 ) -> dict[str, Counts]:
     """A 1 second bin is positive when any event of that class overlaps it."""
     if clip_seconds <= 0 or segment_seconds <= 0:
         raise ValueError("segment length must be positive")
     n_segments = int(np.ceil(clip_seconds / segment_seconds))
     edges = np.arange(n_segments + 1, dtype=np.float64) * segment_seconds
-    counts = empty_counts()
-    reference_groups = _by_class(reference)
-    prediction_groups = _by_class(prediction)
-    for label in CLASSES:
+    counts = empty_counts(classes)
+    reference_groups = _by_class(reference, classes)
+    prediction_groups = _by_class(prediction, classes)
+    for label in classes:
         ref_active = _segment_activity(reference_groups[label], edges)
         pred_active = _segment_activity(prediction_groups[label], edges)
         counts[label].tp = int(np.count_nonzero(ref_active & pred_active))
@@ -114,11 +116,12 @@ def event_counts_for_clip(
     onset_collar: float = ONSET_COLLAR_SECONDS,
     offset_collar: float = OFFSET_COLLAR_SECONDS,
     offset_fraction: float = OFFSET_COLLAR_FRACTION,
+    classes: tuple[str, ...] = CLASSES,
 ) -> dict[str, Counts]:
-    counts = empty_counts()
-    reference_groups = _by_class(reference)
-    prediction_groups = _by_class(prediction)
-    for label in CLASSES:
+    counts = empty_counts(classes)
+    reference_groups = _by_class(reference, classes)
+    prediction_groups = _by_class(prediction, classes)
+    for label in classes:
         counts[label] = _match_one_class(
             reference_groups[label],
             prediction_groups[label],
@@ -160,5 +163,5 @@ def _match_one_class(
 
 
 def accumulate(total: dict[str, Counts], clip_counts: dict[str, Counts]) -> None:
-    for label in CLASSES:
+    for label in clip_counts:
         total[label].add(clip_counts[label])

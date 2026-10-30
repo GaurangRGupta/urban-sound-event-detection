@@ -120,3 +120,28 @@ def log_mel(waveform: np.ndarray) -> np.ndarray:
     if not np.isfinite(logged).all():
         raise RuntimeError("log-mel contains a non-finite value")
     return np.ascontiguousarray(logged)
+
+
+def load_any_16k(path: Path) -> tuple[np.ndarray, float]:
+    """Read any wav as one 10 s channel at 16 kHz, padding or cutting as needed.
+
+    The training loader refuses a clip that is not 10 s long, which is right
+    for the synthetic sets. Real clips, such as the public test and a user's
+    own recording, can be a little shorter or longer. This loader mixes to
+    one channel, resamples, then pads with silence or keeps the first 10 s.
+    It also returns the original length in seconds, so a caller can drop
+    events past the real end of a short clip.
+    """
+    audio, source_rate = sf.read(path, always_2d=True, dtype="float32")
+    waveform = audio.mean(axis=1) if audio.shape[1] != 1 else audio[:, 0]
+    source_rate = int(source_rate)
+    if source_rate != SAMPLE_RATE:
+        divisor = math.gcd(source_rate, SAMPLE_RATE)
+        waveform = signal.resample_poly(waveform, SAMPLE_RATE // divisor, source_rate // divisor)
+    waveform = np.asarray(waveform, dtype=np.float32)
+    seconds = len(waveform) / SAMPLE_RATE
+    if len(waveform) >= TARGET_SAMPLES:
+        waveform = waveform[:TARGET_SAMPLES]
+    else:
+        waveform = np.pad(waveform, (0, TARGET_SAMPLES - len(waveform)))
+    return np.ascontiguousarray(waveform, dtype=np.float32), seconds
