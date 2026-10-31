@@ -45,6 +45,10 @@ def server(tmp_path: Path):
 def test_page_and_detection(server: str, tmp_path: Path) -> None:
     page = urllib.request.urlopen(server + "/").read().decode()
     assert "Urban sound event detection" in page
+    scores = json.loads(urllib.request.urlopen(server + "/scores").read())
+    crnn = next(row for row in scores["rows"] if row["model"] == "CRNN")
+    assert crnn["event_micro"] == 0.142
+    assert crnn["segment_micro"] == 0.612
     wav = tmp_path / "clip.wav"
     sf.write(wav, 0.05 * np.random.default_rng(0).standard_normal(160_000).astype(np.float32), 16_000)
     request = urllib.request.Request(
