@@ -11,10 +11,10 @@ wheels/
 
 # Downloaded audio, labels, features, and checkpoints stay out of git.
 # DVC writes a small pointer next to each tracked folder. Those pointers are committed.
-data/*
-!data/README.md
-!data/.gitignore
-!data/*.dvc
+# Only the two DVC-tracked folders are listed. A wildcard such as data/* makes
+# DVC skip the whole data folder, so it never finds data/raw.dvc.
+/data/raw
+/data/cache
 
 # EDA pictures written by the notebook. The notebook stores the same pictures in its outputs.
 reports/eda/

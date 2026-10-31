@@ -41,6 +41,7 @@ Held-out scores (real public test, DCASE 2019 synthetic conditions) and the tune
 | `src/nndl_project/crnn.py`, `train_crnn.py` | Small CRNN |
 | `src/nndl_project/predict.py` | Wav in, events out (the project output) |
 | `src/nndl_project/evaluate.py` | Tune the decode on validation, score public test and DCASE 2019 |
+| `src/nndl_project/app.py` | Web frontend: upload a wav, see events on a timeline (no extra packages) |
 | `reports/` | One report per trained model, the design note, the final report |
 | `notebooks/` | Data audit, and a per-clip comparison of the four models |
 | `tests/` | Splits, frames and metrics, models, label map, decode, prediction |
@@ -54,7 +55,7 @@ dvc pull -j 2          # data/raw, about 43 GB
 uv run pytest
 ```
 
-See `DVC.md` for the storage setup. Only `data/raw` is tracked by DVC in the current commit. If `data/cache.dvc` is not in your checkout, the trained checkpoints are not in the remote: copy `data/cache/crnn/full/model_last.pt` from the machine that trained it, or retrain.
+See `DVC.md` for the storage setup. If `dvc pull` says "no data tracked", your `.gitignore` still has the old `data/*` line; this commit replaces it with `/data/raw` and `/data/cache`. Only `data/raw` is tracked by DVC in the current commit. If `data/cache.dvc` is not in your checkout, the trained checkpoints are not in the remote: copy `data/cache/crnn/full/model_last.pt` from the machine that trained it, or retrain.
 
 ## Commands
 
@@ -66,6 +67,7 @@ uv run python -m nndl_project.train_crnn            # CRNN, 10 epochs (~16 min e
 uv run python -m nndl_project.evaluate --quick      # tune on validation, score public test + fbsnr_30dB
 uv run python -m nndl_project.evaluate              # all 16 DCASE 2019 conditions as well
 uv run python -m nndl_project.predict clip.wav --street --thresholds reports/final_evaluation_crnn.json
+uv run python -m nndl_project.app                   # web frontend at http://localhost:8000
 ```
 
 Every training script takes `--limit 200` for a smoke check and `--resume` to continue.
@@ -73,3 +75,11 @@ Every training script takes `--limit 200` for a smoke check and `--resume` to co
 ## Data rules
 
 Training uses only `synthetic21_train` (10,000 clips). Validation, and the only place anything is tuned, is `synthetic21_validation` (2,500 clips). The DESED public test (692 real clips) and the 16 DCASE 2019 condition folders are scored once, at the end, with settings frozen on validation. Official splits are kept as published.
+
+## Web frontend
+
+```powershell
+uv run python -m nndl_project.app
+```
+
+A browser tab opens at http://localhost:8000. Drop in a wav file and press Detect events. The page plays the clip, draws each detected event on a timeline (one lane per class, darker means a higher score, a red line follows playback), and lists the events with start, end and score. "Street class names" switches between the DESED names and the ten street classes. For any of the 692 DESED public test clips the page also draws the reference events as dashed boxes. It uses the tuned thresholds from `reports/final_evaluation_crnn*.json` when that file exists.

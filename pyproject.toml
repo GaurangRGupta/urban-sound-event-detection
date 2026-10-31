@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 sed-predict = "nndl_project.predict:main"
 sed-evaluate = "nndl_project.evaluate:main"
+sed-app = "nndl_project.app:main"
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }

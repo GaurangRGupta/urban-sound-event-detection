@@ -107,11 +107,15 @@ What to look for when reading it:
 | Criterion (problem statement) | Status |
 | --- | --- |
 | 1. The label map is written down and checked by a test. Official splits unchanged. | Done: `label_map.py`, `tests/test_label_map.py`; `tests/test_splits.py` guards the splits. |
-| 2. For a clip, the system returns a list of events with label, start, end and score. | Done: `python -m nndl_project.predict clip.wav [--street] [--json out.json]`. |
+| 2. For a clip, the system returns a list of events with label, start, end and score. | Done: `python -m nndl_project.predict clip.wav [--street] [--json out.json]`, and the web frontend `python -m nndl_project.app`. |
 | 3. On classes with timestamp labels, the first model has higher event F1 than the simple baseline, reported for every class. | Met on validation: the GRU beats the baseline on event micro/macro F1, and the CRNN beats it on all ten classes (table above). |
 | 4. No numeric event-F1 target for car_horn, siren, engine_traffic, two_wheeler, construction, music, bird. | Respected: these are listed as having no timestamp labels and are not scored. |
 
-## 7. Limitations
+## 7. Demo frontend
+
+`uv run python -m nndl_project.app` starts a local web page (Python's built-in server, no extra packages). Upload a wav and it shows the detected events on a timeline and in a table, with an audio player whose position is marked on the timeline. For DESED public test clips it also draws the ground truth, so the gap between prediction and reference can be seen directly.
+
+## 8. Limitations
 
 - The training audio is synthetic and from homes. Street sounds other than speech and dogs are not learned, only mapped to `other` when they are DESED classes.
 - The clip-level (weak-label) loss from the method was not trained: the FSD50K and DESED weak-label waves were not downloaded.
@@ -120,7 +124,7 @@ What to look for when reading it:
 
 Natural next steps: dropout and SpecAugment-style masking, mean-teacher training on the DESED unlabeled clips, and strongly labeled street data (for example URBAN-SED) for the seven missing street classes.
 
-## 8. Reproduce
+## 9. Reproduce
 
 ```powershell
 uv sync
@@ -132,4 +136,5 @@ uv run python -m nndl_project.train_frame_gru
 uv run python -m nndl_project.train_crnn
 uv run python -m nndl_project.evaluate
 uv run python -m nndl_project.predict path\to\clip.wav --street --thresholds reports\final_evaluation_crnn.json
+uv run python -m nndl_project.app
 ```
